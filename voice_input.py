@@ -23,18 +23,33 @@ from transcriber import make_transcriber
 
 # ---- Config -----------------------------------------------------------------
 
-_DEFAULT_CONFIG = """{
+DEFAULT_CONFIG = {
     "provider": "siliconflow",
-
     "siliconflow_api_key": "",
     "volcengine_api_key": "",
-
     "hotkey": "ctrl+alt+v",
     "toggle_hotkey": "ctrl+shift+r",
-    "paste_after": true,
-    "use_system_proxy": false
+    "paste_after": True,
+    "use_system_proxy": False,
 }
-"""
+
+# (provider key, label shown in the settings dropdown)
+PROVIDERS = [
+    ("siliconflow", "硅基流动 SenseVoice（免费，推荐）"),
+    ("volcengine", "火山引擎 / 豆包 Seed-ASR（按量付费）"),
+]
+
+# How to obtain each provider's key (shown under the input box).
+KEY_HELP = {
+    "siliconflow": (
+        '免费申请：<a href="https://cloud.siliconflow.cn/">cloud.siliconflow.cn</a>'
+        " → 登录后进「API 密钥」→ 新建 → 复制 sk- 开头的字符串"
+    ),
+    "volcengine": (
+        '<a href="https://console.volcengine.com/">console.volcengine.com</a>'
+        " → 开通「语音技术·录音文件识别(大模型)」→ 在 API Key 管理里新建"
+    ),
+}
 
 
 def _app_dir() -> Path:
@@ -49,46 +64,36 @@ def _app_dir() -> Path:
 
 
 _cfg_path = _app_dir() / "config.json"
+LOG_PATH = _app_dir() / "voice_input.runtime.log"
 
-if not _cfg_path.exists():
-    # First run (typical for the .exe): create a blank config next to us,
-    # open it in Notepad, and tell the user to fill in the API key.
-    _cfg_path.write_text(_DEFAULT_CONFIG, encoding="utf-8")
-    try:
-        ctypes.windll.user32.MessageBoxW(
-            None,
-            "首次使用：已生成 config.json，请填入你的 API Key 后重新运行。\n\n"
-            "硅基流动免费 Key 申请：https://cloud.siliconflow.cn/\n"
-            "（在「API 密钥」里新建，复制 sk- 开头的字符串）",
-            "语音输入 - 请先配置",
-            0x40,  # MB_ICONINFORMATION
-        )
-        os.startfile(str(_cfg_path))  # noqa: S606 -- open in default editor
-    except Exception:
-        pass
-    sys.exit(0)
 
-with open(_cfg_path, encoding="utf-8") as _f:
-    _cfg = json.load(_f)
+def _load_config() -> dict:
+    cfg = dict(DEFAULT_CONFIG)
+    if _cfg_path.exists():
+        try:
+            with open(_cfg_path, encoding="utf-8") as f:
+                cfg.update(json.load(f))
+        except Exception:
+            pass
+    return cfg
+
+
+def _save_config(cfg: dict):
+    with open(_cfg_path, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=4)
+
+
+def _has_key(cfg: dict) -> bool:
+    provider = (cfg.get("provider") or "siliconflow").lower()
+    return bool((cfg.get(f"{provider}_api_key") or "").strip())
+
+
+_cfg = _load_config()
 
 HOTKEY: str = _cfg.get("hotkey", "ctrl+alt+v")
 TOGGLE_HOTKEY: str = _cfg.get("toggle_hotkey", "ctrl+shift+r")
 PASTE_AFTER: bool = _cfg.get("paste_after", True)
 USE_SYSTEM_PROXY: bool = _cfg.get("use_system_proxy", False)
-LOG_PATH = _app_dir() / "voice_input.runtime.log"
-
-_active_provider = (_cfg.get("provider") or "siliconflow").lower()
-if not _cfg.get(f"{_active_provider}_api_key"):
-    try:
-        ctypes.windll.user32.MessageBoxW(
-            None,
-            f"当前 provider 是 {_active_provider}，但它的 api_key 还没填。\n"
-            f"请打开 config.json 填入 Key，否则识别会报错。",
-            "语音输入 - 缺少 API Key",
-            0x30,  # MB_ICONWARNING
-        )
-    except Exception:
-        pass
 
 _MUTEX_HANDLE = None
 
@@ -215,6 +220,7 @@ class TrayIcon(pystray.Icon):
 
 class FloatingRecordButton(QtWidgets.QWidget):
     state_changed = QtCore.pyqtSignal(str)
+    open_settings = QtCore.pyqtSignal()
 
     def __init__(self, toggle_callback, focus_callback=None):
         super().__init__()
@@ -298,6 +304,88 @@ class FloatingRecordButton(QtWidgets.QWidget):
         self._drag_offset = None
         self._dragging = False
         event.accept()
+
+
+# ---- Settings dialog --------------------------------------------------------
+
+class SettingsDialog(QtWidgets.QDialog):
+    """Small window: pick a provider, paste a key, with usage instructions."""
+
+    def __init__(self, cfg: dict, parent=None):
+        super().__init__(parent)
+        self._cfg = cfg
+        self.setWindowTitle("语音输入 · 设置")
+        self.setMinimumWidth(480)
+        self.setWindowFlags(self.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setSpacing(8)
+
+        layout.addWidget(QtWidgets.QLabel("① 选择语音识别服务："))
+        self._provider_combo = QtWidgets.QComboBox()
+        provider_keys = [k for k, _ in PROVIDERS]
+        for key, label in PROVIDERS:
+            self._provider_combo.addItem(label, key)
+        cur = (cfg.get("provider") or "siliconflow").lower()
+        self._provider_combo.setCurrentIndex(provider_keys.index(cur) if cur in provider_keys else 0)
+        layout.addWidget(self._provider_combo)
+
+        layout.addWidget(QtWidgets.QLabel("② 粘贴该服务的 API Key："))
+        self._key_edit = QtWidgets.QLineEdit()
+        self._key_edit.setPlaceholderText("在这里粘贴 Key")
+        layout.addWidget(self._key_edit)
+
+        self._help = QtWidgets.QLabel()
+        self._help.setWordWrap(True)
+        self._help.setOpenExternalLinks(True)
+        self._help.setStyleSheet("color:#555; font-size:12px;")
+        layout.addWidget(self._help)
+
+        usage = QtWidgets.QLabel(
+            "<b>怎么用（识别后会自动粘贴到你刚才的光标处）：</b><br>"
+            "🖱 <b>鼠标</b>：点屏幕下方的红色话筒按钮开始录音，再点一次停止<br>"
+            f"⌨ <b>按住说话</b>：按住 <b>{cfg.get('hotkey', 'ctrl+alt+v')}</b>，松开即识别<br>"
+            f"⌨ <b>开关模式</b>：按一下 <b>{cfg.get('toggle_hotkey', 'ctrl+shift+r')}</b> 开始，再按一下停止（适合长句）<br>"
+            "<br>之后想改设置：右键托盘图标 → 设置。"
+        )
+        usage.setWordWrap(True)
+        usage.setStyleSheet("background:#f4f4f4; padding:10px; font-size:12px;")
+        layout.addWidget(usage)
+
+        btns = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.Save | QtWidgets.QDialogButtonBox.Cancel
+        )
+        btns.button(QtWidgets.QDialogButtonBox.Save).setText("保存并使用")
+        btns.button(QtWidgets.QDialogButtonBox.Cancel).setText("取消")
+        btns.accepted.connect(self._on_save)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+        self._provider_combo.currentIndexChanged.connect(self._refresh)
+        self._refresh()
+
+    def _current_provider(self) -> str:
+        return self._provider_combo.currentData()
+
+    def _refresh(self):
+        prov = self._current_provider()
+        self._help.setText(KEY_HELP.get(prov, ""))
+        self._key_edit.setText(self._cfg.get(f"{prov}_api_key", ""))
+
+    def _on_save(self):
+        prov = self._current_provider()
+        key = self._key_edit.text().strip()
+        if not key:
+            QtWidgets.QMessageBox.warning(self, "还没填 Key", "请先粘贴 API Key 再保存。")
+            return
+        self._cfg["provider"] = prov
+        self._cfg[f"{prov}_api_key"] = key
+        try:
+            _save_config(self._cfg)
+        except Exception as exc:  # pragma: no cover - disk errors
+            QtWidgets.QMessageBox.critical(self, "保存失败", str(exc))
+            return
+        self.accept()
 
 
 # ---- Hotkey parsing ---------------------------------------------------------
@@ -458,18 +546,35 @@ class VoiceInput:
             if app is not None:
                 app.quit()
 
-        menu = pystray.Menu(pystray.MenuItem("Record", lambda i,t: self._on_toggle_press(), default=True), pystray.MenuItem("Quit", _quit))
+        def _settings(icon, _item):
+            # Tray runs on its own thread; hop to the Qt thread via the signal.
+            if self._floating_button is not None:
+                self._floating_button.open_settings.emit()
+
+        menu = pystray.Menu(
+            pystray.MenuItem("Record", lambda i, t: self._on_toggle_press(), default=True),
+            pystray.MenuItem("设置 / Settings", _settings),
+            pystray.MenuItem("Quit", _quit),
+        )
         icon = TrayIcon("voice-input", _make_tray_image(), "Voice Input", menu)
         icon.on_activate = self._on_toggle_press
         return icon
+
+    def _open_settings(self):
+        """Show the settings dialog (Qt main thread) and rebuild the transcriber."""
+        dlg = SettingsDialog(_cfg)
+        dlg.activateWindow()
+        dlg.raise_()
+        if dlg.exec_() == QtWidgets.QDialog.Accepted:
+            self._transcriber = make_transcriber(_cfg)
+            _log(f"settings saved provider={_cfg.get('provider')}")
+            return True
+        return False
 
     def run(self):
         if not _ensure_single_instance():
             print("[voice-input] 已经在运行，退出本次启动。", flush=True)
             return
-
-        self._register_hotkey()
-        print(f"[就绪] 按住 {HOTKEY} 录音；按 {TOGGLE_HOTKEY} 开始/停止录音", flush=True)
 
         app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
         app.setQuitOnLastWindowClosed(False)
@@ -478,6 +583,17 @@ class VoiceInput:
             self._on_toggle_press,
             self._remember_paste_target,
         )
+        self._floating_button.open_settings.connect(self._open_settings)
+
+        # First run / missing key: force the settings dialog before starting.
+        if not _has_key(_cfg):
+            if not self._open_settings():
+                _log("settings cancelled on first run, exiting")
+                return
+
+        self._register_hotkey()
+        print(f"[就绪] 按住 {HOTKEY} 录音；按 {TOGGLE_HOTKEY} 开始/停止录音", flush=True)
+
         self._indicator.add_listener(self._floating_button.set_state)
         self._floating_button.place_on_screen()
         self._floating_button.show()

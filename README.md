@@ -24,54 +24,33 @@
 pip install -r requirements.txt
 ```
 
-## 二、申请 Key 并填写配置
+## 二、首次运行：弹窗填 Key（不用改任何文件）
 
-1. 把 `config.example.json` **复制一份**，改名为 `config.json`。
-2. 按下面方法拿到 Key，填进 `config.json` 对应的 `api_key` 里。
+**第一次启动会自动弹出一个设置窗口**，照着做即可：
 
-### 方案 A：硅基流动（免费，默认推荐）
+1. 上面下拉框选服务：**硅基流动（免费，默认）** 或 火山引擎；
+2. 中间输入框**粘贴你的 API Key**；
+3. 点 **「保存并使用」** —— 完成，开始用。
 
+窗口里还写了鼠标 / 键盘两种用法，照着用就行。
+以后想换 Key 或换服务：**右键托盘图标 → 设置**，随时改。
+
+### 怎么拿 Key
+
+**硅基流动（免费，推荐）**
 1. 打开 https://cloud.siliconflow.cn/ ，注册账号（新用户有免费额度）。
-2. 登录后，左侧菜单进入 **「API 密钥」**（账户设置里），点击 **新建 API 密钥**。
-3. 复制以 `sk-` 开头的字符串。
-4. 把它填到 `config.json` 的 `siliconflow_api_key`，**只改这一行**：
+2. 登录后进 **「API 密钥」**，点 **新建 API 密钥**，复制 `sk-` 开头的字符串。
 
-```json
-{
-    "provider": "siliconflow",
-    "siliconflow_api_key": "sk-你复制的密钥"
-}
-```
+**火山引擎 / 豆包（按量付费，可选）**
+1. 打开 https://console.volcengine.com/ ，注册并实名。
+2. 开通 **「语音技术 · 录音文件识别（大模型）/ Seed-ASR」**。
+3. 在 **API Key 管理** 里新建一个 API Key（UUID 格式）。
 
-> 服务地址和模型（免费的 `SenseVoiceSmall`）已在程序里写死，不用填。
-
-### 方案 B：火山引擎 / 豆包（按量付费，可选）
-
-1. 打开 https://console.volcengine.com/ ，注册并完成实名认证。
-2. 搜索/进入 **「语音技术」**，开通 **「录音文件识别（大模型）/ Seed-ASR」** 服务。
-3. 在 **API Key 管理** 里创建一个 API Key（一串 UUID 格式）。
-4. 把它填到 `config.json` 的 `volcengine_api_key`，并把 `provider` 改成 `volcengine`：
-
-```json
-{
-    "provider": "volcengine",
-    "volcengine_api_key": "你的火山 API Key"
-}
-```
-
-> 火山的服务地址也已写死，同样不用填。
+> 服务地址和模型都已在程序里写死，你**只需要填 Key**。
 
 ## 三、运行
 
-双击 **`start.bat`** 即可（推荐，后台静默运行）。
-
-或者在命令行里：
-
-```bat
-python voice_input.py
-```
-
-启动后屏幕下方会出现一个红色话筒悬浮按钮，托盘也有图标。退出：右键托盘图标 → Quit。
+双击 **`start.bat`**（或 `python voice_input.py`）。启动后屏幕下方出现红色话筒悬浮按钮，托盘也有图标。退出：右键托盘图标 → Quit。
 
 ---
 
