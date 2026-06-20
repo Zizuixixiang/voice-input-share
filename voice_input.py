@@ -23,7 +23,59 @@ from transcriber import make_transcriber
 
 # ---- Config -----------------------------------------------------------------
 
-_cfg_path = Path(__file__).parent / "config.json"
+_DEFAULT_CONFIG = """{
+    "provider": "siliconflow",
+
+    "siliconflow": {
+        "api_key": "",
+        "base_url": "https://api.siliconflow.cn/v1/audio/transcriptions",
+        "model": "FunAudioLLM/SenseVoiceSmall"
+    },
+
+    "volcengine": {
+        "api_key": "",
+        "base_url": "https://openspeech.bytedance.com/api/v3/auc/bigmodel"
+    },
+
+    "hotkey": "ctrl+alt+v",
+    "toggle_hotkey": "ctrl+shift+r",
+    "paste_after": true,
+    "use_system_proxy": false
+}
+"""
+
+
+def _app_dir() -> Path:
+    """Folder to read config / write logs from.
+
+    When frozen by PyInstaller, files live next to the .exe, not in the
+    temp extraction dir, so use the executable's folder.
+    """
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).parent
+    return Path(__file__).parent
+
+
+_cfg_path = _app_dir() / "config.json"
+
+if not _cfg_path.exists():
+    # First run (typical for the .exe): create a blank config next to us,
+    # open it in Notepad, and tell the user to fill in the API key.
+    _cfg_path.write_text(_DEFAULT_CONFIG, encoding="utf-8")
+    try:
+        ctypes.windll.user32.MessageBoxW(
+            None,
+            "首次使用：已生成 config.json，请填入你的 API Key 后重新运行。\n\n"
+            "硅基流动免费 Key 申请：https://cloud.siliconflow.cn/\n"
+            "（在「API 密钥」里新建，复制 sk- 开头的字符串）",
+            "语音输入 - 请先配置",
+            0x40,  # MB_ICONINFORMATION
+        )
+        os.startfile(str(_cfg_path))  # noqa: S606 -- open in default editor
+    except Exception:
+        pass
+    sys.exit(0)
+
 with open(_cfg_path, encoding="utf-8") as _f:
     _cfg = json.load(_f)
 
@@ -31,7 +83,20 @@ HOTKEY: str = _cfg.get("hotkey", "ctrl+alt+v")
 TOGGLE_HOTKEY: str = _cfg.get("toggle_hotkey", "ctrl+shift+r")
 PASTE_AFTER: bool = _cfg.get("paste_after", True)
 USE_SYSTEM_PROXY: bool = _cfg.get("use_system_proxy", False)
-LOG_PATH = Path(__file__).with_name("voice_input.runtime.log")
+LOG_PATH = _app_dir() / "voice_input.runtime.log"
+
+_active_provider = (_cfg.get("provider") or "siliconflow").lower()
+if not (_cfg.get(_active_provider, {}) or {}).get("api_key"):
+    try:
+        ctypes.windll.user32.MessageBoxW(
+            None,
+            f"当前 provider 是 {_active_provider}，但它的 api_key 还没填。\n"
+            f"请打开 config.json 填入 Key，否则识别会报错。",
+            "语音输入 - 缺少 API Key",
+            0x30,  # MB_ICONWARNING
+        )
+    except Exception:
+        pass
 
 _MUTEX_HANDLE = None
 
