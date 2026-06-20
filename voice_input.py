@@ -335,16 +335,24 @@ class SettingsDialog(QtWidgets.QDialog):
         self.setMinimumWidth(560)
         self.setWindowFlags(self.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
 
-        # Bump the base font so everything is comfortably readable.
+        # One base font drives the whole dialog so sizes stay consistent.
+        # (Everything below inherits this; no widget hardcodes its own size.)
         base_font = self.font()
-        base_font.setPointSize(max(base_font.pointSize(), 11) + 2)
+        base_font.setPointSize(max(base_font.pointSize(), 11) + 1)
         self.setFont(base_font)
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setSpacing(10)
         layout.setContentsMargins(18, 18, 18, 18)
 
-        layout.addWidget(QtWidgets.QLabel("① 选择语音识别服务："))
+        # Section headers: bold and a hair larger so the numbered steps read
+        # clearly as titles above their controls.
+        header_pt = base_font.pointSize() + 1
+        header_style = f"font-weight:bold; font-size:{header_pt}pt;"
+
+        step1 = QtWidgets.QLabel("① 选择语音识别服务：")
+        step1.setStyleSheet(header_style)
+        layout.addWidget(step1)
         self._provider_combo = QtWidgets.QComboBox()
         provider_keys = [k for k, _ in PROVIDERS]
         for key, label in PROVIDERS:
@@ -357,7 +365,9 @@ class SettingsDialog(QtWidgets.QDialog):
         self._open_page_btn.clicked.connect(self._open_signup_page)
         layout.addWidget(self._open_page_btn)
 
-        layout.addWidget(QtWidgets.QLabel("② 粘贴该服务的 API Key："))
+        step2 = QtWidgets.QLabel("② 粘贴该服务的 API Key：")
+        step2.setStyleSheet(header_style)
+        layout.addWidget(step2)
         key_row = QtWidgets.QHBoxLayout()
         self._key_edit = QtWidgets.QLineEdit()
         self._key_edit.setEchoMode(QtWidgets.QLineEdit.Password)
@@ -374,13 +384,13 @@ class SettingsDialog(QtWidgets.QDialog):
 
         # Shows the saved key masked (only last 4 chars), so it's never plaintext.
         self._saved_label = QtWidgets.QLabel()
-        self._saved_label.setStyleSheet("color:#555; font-size:13px;")
+        self._saved_label.setStyleSheet("color:#555;")
         layout.addWidget(self._saved_label)
 
         self._help = QtWidgets.QLabel()
         self._help.setWordWrap(True)
         self._help.setOpenExternalLinks(True)
-        self._help.setStyleSheet("color:#555; font-size:13px;")
+        self._help.setStyleSheet("color:#555;")
         layout.addWidget(self._help)
 
         usage = QtWidgets.QLabel(
@@ -394,7 +404,7 @@ class SettingsDialog(QtWidgets.QDialog):
             "<br>之后想改设置：右键任务栏托盘里的红色话筒图标 → 设置。"
         )
         usage.setWordWrap(True)
-        usage.setStyleSheet("background:#f4f4f4; padding:12px; font-size:13px;")
+        usage.setStyleSheet("background:#f4f4f4; padding:12px; border-radius:6px;")
         layout.addWidget(usage)
 
         btns = QtWidgets.QDialogButtonBox(
