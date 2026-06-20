@@ -1,0 +1,18 @@
+# 个人配置（含 API Key），绝对不要上传！
+config.json
+
+# 运行日志
+*.log
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# PyInstaller 打包产物
+build/
+dist/
+*.spec
+
+# 虚拟环境
+.venv/
+venv/
