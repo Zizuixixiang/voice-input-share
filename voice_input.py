@@ -574,6 +574,16 @@ class VoiceInput:
     def run(self):
         if not _ensure_single_instance():
             print("[voice-input] 已经在运行，退出本次启动。", flush=True)
+            try:
+                ctypes.windll.user32.MessageBoxW(
+                    None,
+                    "语音输入已经在运行了（任务栏右下角托盘里能找到红色话筒图标）。\n"
+                    "如果是你之前用源码 / 旧版启动的，请先退出那个再打开本程序。",
+                    "语音输入 · 已在运行",
+                    0x40,  # MB_ICONINFORMATION
+                )
+            except Exception:
+                pass
             return
 
         app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
