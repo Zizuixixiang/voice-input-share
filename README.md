@@ -34,36 +34,32 @@ pip install -r requirements.txt
 1. 打开 https://cloud.siliconflow.cn/ ，注册账号（新用户有免费额度）。
 2. 登录后，左侧菜单进入 **「API 密钥」**（账户设置里），点击 **新建 API 密钥**。
 3. 复制以 `sk-` 开头的字符串。
-4. 填到 `config.json` 里：
+4. 把它填到 `config.json` 的 `siliconflow_api_key`，**只改这一行**：
 
 ```json
 {
     "provider": "siliconflow",
-    "siliconflow": {
-        "api_key": "sk-你复制的密钥",
-        ...
-    }
+    "siliconflow_api_key": "sk-你复制的密钥"
 }
 ```
 
-> 模型默认用免费的 `FunAudioLLM/SenseVoiceSmall`，不用改。
+> 服务地址和模型（免费的 `SenseVoiceSmall`）已在程序里写死，不用填。
 
 ### 方案 B：火山引擎 / 豆包（按量付费，可选）
 
 1. 打开 https://console.volcengine.com/ ，注册并完成实名认证。
 2. 搜索/进入 **「语音技术」**，开通 **「录音文件识别（大模型）/ Seed-ASR」** 服务。
 3. 在 **API Key 管理** 里创建一个 API Key（一串 UUID 格式）。
-4. 填到 `config.json`，并把 `provider` 改成 `volcengine`：
+4. 把它填到 `config.json` 的 `volcengine_api_key`，并把 `provider` 改成 `volcengine`：
 
 ```json
 {
     "provider": "volcengine",
-    "volcengine": {
-        "api_key": "你的火山 API Key",
-        ...
-    }
+    "volcengine_api_key": "你的火山 API Key"
 }
 ```
+
+> 火山的服务地址也已写死，同样不用填。
 
 ## 三、运行
 

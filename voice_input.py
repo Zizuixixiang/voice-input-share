@@ -26,16 +26,8 @@ from transcriber import make_transcriber
 _DEFAULT_CONFIG = """{
     "provider": "siliconflow",
 
-    "siliconflow": {
-        "api_key": "",
-        "base_url": "https://api.siliconflow.cn/v1/audio/transcriptions",
-        "model": "FunAudioLLM/SenseVoiceSmall"
-    },
-
-    "volcengine": {
-        "api_key": "",
-        "base_url": "https://openspeech.bytedance.com/api/v3/auc/bigmodel"
-    },
+    "siliconflow_api_key": "",
+    "volcengine_api_key": "",
 
     "hotkey": "ctrl+alt+v",
     "toggle_hotkey": "ctrl+shift+r",
@@ -86,7 +78,7 @@ USE_SYSTEM_PROXY: bool = _cfg.get("use_system_proxy", False)
 LOG_PATH = _app_dir() / "voice_input.runtime.log"
 
 _active_provider = (_cfg.get("provider") or "siliconflow").lower()
-if not (_cfg.get(_active_provider, {}) or {}).get("api_key"):
+if not _cfg.get(f"{_active_provider}_api_key"):
     try:
         ctypes.windll.user32.MessageBoxW(
             None,

@@ -1,16 +1,8 @@
 {
     "provider": "siliconflow",
 
-    "siliconflow": {
-        "api_key": "在这里填你的硅基流动 Key（sk- 开头）",
-        "base_url": "https://api.siliconflow.cn/v1/audio/transcriptions",
-        "model": "FunAudioLLM/SenseVoiceSmall"
-    },
-
-    "volcengine": {
-        "api_key": "在这里填你的火山引擎 Key（可留空，不用就不用填）",
-        "base_url": "https://openspeech.bytedance.com/api/v3/auc/bigmodel"
-    },
+    "siliconflow_api_key": "在这里填硅基流动的 Key（sk- 开头，免费）",
+    "volcengine_api_key": "用火山引擎才填，不用就留空",
 
     "hotkey": "ctrl+alt+v",
     "toggle_hotkey": "ctrl+shift+r",

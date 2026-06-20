@@ -184,25 +184,33 @@ class VolcengineTranscriber:
 # Factory
 # --------------------------------------------------------------------------- #
 
+# Service endpoints are fixed here so users only need to fill in an api_key.
+SILICONFLOW_URL = "https://api.siliconflow.cn/v1/audio/transcriptions"
+SILICONFLOW_MODEL = "FunAudioLLM/SenseVoiceSmall"
+VOLCENGINE_URL = "https://openspeech.bytedance.com/api/v3/auc/bigmodel"
+
+
 def make_transcriber(cfg: dict):
-    """Build a transcriber from the loaded config dict."""
+    """Build a transcriber from the loaded config dict.
+
+    Users only set ``provider`` and the matching ``*_api_key``. URLs/models are
+    fixed above.
+    """
     provider = (cfg.get("provider") or "siliconflow").lower()
     use_proxy = cfg.get("use_system_proxy", False)
 
     if provider == "siliconflow":
-        sf = cfg.get("siliconflow", {})
         return SiliconFlowTranscriber(
-            sf.get("api_key", ""),
-            sf.get("base_url", "https://api.siliconflow.cn/v1/audio/transcriptions"),
-            sf.get("model", "FunAudioLLM/SenseVoiceSmall"),
+            cfg.get("siliconflow_api_key", ""),
+            SILICONFLOW_URL,
+            SILICONFLOW_MODEL,
             use_system_proxy=use_proxy,
         )
 
     if provider == "volcengine":
-        vc = cfg.get("volcengine", {})
         return VolcengineTranscriber(
-            vc.get("api_key", ""),
-            vc.get("base_url", "https://openspeech.bytedance.com/api/v3/auc/bigmodel"),
+            cfg.get("volcengine_api_key", ""),
+            VOLCENGINE_URL,
             use_system_proxy=use_proxy,
         )
 
