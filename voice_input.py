@@ -35,19 +35,26 @@ DEFAULT_CONFIG = {
 
 # (provider key, label shown in the settings dropdown)
 PROVIDERS = [
-    ("siliconflow", "硅基流动 SenseVoice（免费，推荐）"),
-    ("volcengine", "火山引擎 / 豆包 Seed-ASR（按量付费）"),
+    ("siliconflow", "硅基流动 SenseVoice（免费）"),
+    ("volcengine", "火山引擎 / 豆包 Seed-ASR（准确度高，按量付费）"),
 ]
+
+# Where each provider's API key is created (opened by the "打开申请页面" button).
+SIGNUP_URL = {
+    "siliconflow": "https://cloud.siliconflow.cn/account/ak",
+    "volcengine": "https://console.volcengine.com/speech/new/experience/asr?projectName=default",
+}
 
 # How to obtain each provider's key (shown under the input box).
 KEY_HELP = {
     "siliconflow": (
-        '免费申请：<a href="https://cloud.siliconflow.cn/">cloud.siliconflow.cn</a>'
-        " → 登录后进「API 密钥」→ 新建 → 复制 sk- 开头的字符串"
+        '免费申请：<a href="https://cloud.siliconflow.cn/account/ak">硅基流动 · API 密钥页</a>'
+        " → 登录后点「新建 API 密钥」→ 复制 sk- 开头的字符串"
     ),
     "volcengine": (
-        '<a href="https://console.volcengine.com/">console.volcengine.com</a>'
-        " → 开通「语音技术·录音文件识别(大模型)」→ 在 API Key 管理里新建"
+        '开通体验：<a href="https://console.volcengine.com/speech/new/experience/asr?projectName=default">'
+        "火山引擎语音识别(豆包)体验页</a>"
+        " → 开通「语音技术·语音识别大模型」→ 在 API Key 管理里新建并复制"
     ),
 }
 
@@ -308,6 +315,16 @@ class FloatingRecordButton(QtWidgets.QWidget):
 
 # ---- Settings dialog --------------------------------------------------------
 
+def _mask_key(key: str) -> str:
+    """Hide a key, revealing only its last 4 characters."""
+    key = (key or "").strip()
+    if not key:
+        return ""
+    if len(key) <= 4:
+        return "•" * len(key)
+    return "•" * 8 + key[-4:]
+
+
 class SettingsDialog(QtWidgets.QDialog):
     """Small window: pick a provider, paste a key, with usage instructions."""
 
@@ -315,11 +332,17 @@ class SettingsDialog(QtWidgets.QDialog):
         super().__init__(parent)
         self._cfg = cfg
         self.setWindowTitle("语音输入 · 设置")
-        self.setMinimumWidth(480)
+        self.setMinimumWidth(560)
         self.setWindowFlags(self.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
 
+        # Bump the base font so everything is comfortably readable.
+        base_font = self.font()
+        base_font.setPointSize(max(base_font.pointSize(), 11) + 2)
+        self.setFont(base_font)
+
         layout = QtWidgets.QVBoxLayout(self)
-        layout.setSpacing(8)
+        layout.setSpacing(10)
+        layout.setContentsMargins(18, 18, 18, 18)
 
         layout.addWidget(QtWidgets.QLabel("① 选择语音识别服务："))
         self._provider_combo = QtWidgets.QComboBox()
@@ -330,26 +353,48 @@ class SettingsDialog(QtWidgets.QDialog):
         self._provider_combo.setCurrentIndex(provider_keys.index(cur) if cur in provider_keys else 0)
         layout.addWidget(self._provider_combo)
 
+        self._open_page_btn = QtWidgets.QPushButton("🌐 打开申请页面（在浏览器里拿 Key）")
+        self._open_page_btn.clicked.connect(self._open_signup_page)
+        layout.addWidget(self._open_page_btn)
+
         layout.addWidget(QtWidgets.QLabel("② 粘贴该服务的 API Key："))
+        key_row = QtWidgets.QHBoxLayout()
         self._key_edit = QtWidgets.QLineEdit()
+        self._key_edit.setEchoMode(QtWidgets.QLineEdit.Password)
         self._key_edit.setPlaceholderText("在这里粘贴 Key")
-        layout.addWidget(self._key_edit)
+        key_row.addWidget(self._key_edit)
+        self._show_key = QtWidgets.QCheckBox("显示")
+        self._show_key.toggled.connect(
+            lambda on: self._key_edit.setEchoMode(
+                QtWidgets.QLineEdit.Normal if on else QtWidgets.QLineEdit.Password
+            )
+        )
+        key_row.addWidget(self._show_key)
+        layout.addLayout(key_row)
+
+        # Shows the saved key masked (only last 4 chars), so it's never plaintext.
+        self._saved_label = QtWidgets.QLabel()
+        self._saved_label.setStyleSheet("color:#555; font-size:13px;")
+        layout.addWidget(self._saved_label)
 
         self._help = QtWidgets.QLabel()
         self._help.setWordWrap(True)
         self._help.setOpenExternalLinks(True)
-        self._help.setStyleSheet("color:#555; font-size:12px;")
+        self._help.setStyleSheet("color:#555; font-size:13px;")
         layout.addWidget(self._help)
 
         usage = QtWidgets.QLabel(
-            "<b>怎么用（识别后会自动粘贴到你刚才的光标处）：</b><br>"
-            "🖱 <b>鼠标</b>：点屏幕下方的红色话筒按钮开始录音，再点一次停止<br>"
-            f"⌨ <b>按住说话</b>：按住 <b>{cfg.get('hotkey', 'ctrl+alt+v')}</b>，松开即识别<br>"
-            f"⌨ <b>开关模式</b>：按一下 <b>{cfg.get('toggle_hotkey', 'ctrl+shift+r')}</b> 开始，再按一下停止（适合长句）<br>"
-            "<br>之后想改设置：右键托盘图标 → 设置。"
+            "<b>怎么用</b><br>"
+            "①&nbsp;先用鼠标点好你要输入文字的框，让光标在里面闪。<br>"
+            f"②&nbsp;点屏幕下方的红色话筒按钮，或按住 <b>{cfg.get('hotkey', 'ctrl+alt+v')}</b> 说话。<br>"
+            "③&nbsp;说完再点一次按钮（或松开按键），文字会自动粘贴到光标处。<br>"
+            "<br>"
+            "⚠ <b>如果没点输入框</b>（光标不在任何框里），文字不会出现在屏幕上，"
+            "但已经存进了剪贴板——按 <b>Win + V</b> 就能找到并粘贴。<br>"
+            "<br>之后想改设置：右键任务栏托盘里的红色话筒图标 → 设置。"
         )
         usage.setWordWrap(True)
-        usage.setStyleSheet("background:#f4f4f4; padding:10px; font-size:12px;")
+        usage.setStyleSheet("background:#f4f4f4; padding:12px; font-size:13px;")
         layout.addWidget(usage)
 
         btns = QtWidgets.QDialogButtonBox(
@@ -367,14 +412,32 @@ class SettingsDialog(QtWidgets.QDialog):
     def _current_provider(self) -> str:
         return self._provider_combo.currentData()
 
+    def _open_signup_page(self):
+        url = SIGNUP_URL.get(self._current_provider())
+        if url:
+            QtGui.QDesktopServices.openUrl(QtCore.QUrl(url))
+
     def _refresh(self):
         prov = self._current_provider()
         self._help.setText(KEY_HELP.get(prov, ""))
-        self._key_edit.setText(self._cfg.get(f"{prov}_api_key", ""))
+        # Don't put the raw key into the (toggleable) edit box; leave it empty
+        # and show only a masked hint of what's already saved.
+        self._key_edit.clear()
+        saved = (self._cfg.get(f"{prov}_api_key", "") or "").strip()
+        if saved:
+            self._key_edit.setPlaceholderText("已保存，留空＝不修改；要换就粘贴新 Key")
+            self._saved_label.setText(f"当前已保存的 Key：{_mask_key(saved)}")
+            self._saved_label.show()
+        else:
+            self._key_edit.setPlaceholderText("在这里粘贴 Key")
+            self._saved_label.hide()
 
     def _on_save(self):
         prov = self._current_provider()
         key = self._key_edit.text().strip()
+        existing = (self._cfg.get(f"{prov}_api_key", "") or "").strip()
+        # Empty input keeps the existing key (so users can just switch provider).
+        key = key or existing
         if not key:
             QtWidgets.QMessageBox.warning(self, "还没填 Key", "请先粘贴 API Key 再保存。")
             return
